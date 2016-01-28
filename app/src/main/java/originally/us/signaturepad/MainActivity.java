@@ -17,8 +17,9 @@ public class MainActivity extends AppCompatActivity {
     public static final float SIGNATURE_MAX_STROKE = 4f;
 
     private SignaturePad signaturePad;
-    private Button btnClear, btnSave, btnReset, btnUndo, btnErase;
-    private String drawingImageName;
+    private Button btnClear, btnSave, btnReset;
+    private Button btnUndo, btnRedo;
+    private Button btnErase, btnBrush;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,18 +34,21 @@ public class MainActivity extends AppCompatActivity {
         btnClear = (Button) findViewById(R.id.btn_clear);
         btnSave = (Button) findViewById(R.id.btn_save);
         btnReset = (Button) findViewById(R.id.btn_reset);
+
         btnUndo = (Button) findViewById(R.id.btn_undo);
+        btnRedo = (Button) findViewById(R.id.btn_redo);
+
+        btnBrush = (Button) findViewById(R.id.btn_brush);
         btnErase = (Button) findViewById(R.id.btn_erase);
     }
 
     protected void bindData() {
-        drawingImageName = "ABC";
         signaturePad.setVelocityFilterWeight(10);
 
         btnClear.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                signaturePad.clear();
+                signaturePad.clearAll();
             }
         });
 
@@ -52,7 +56,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 saveDrawingImage();
-                signaturePad.setErasing(false);
             }
         });
 
@@ -71,10 +74,24 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        btnRedo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                signaturePad.redo();
+            }
+        });
+
         btnErase.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 signaturePad.setErasing(true);
+            }
+        });
+
+        btnBrush.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                signaturePad.setErasing(false);
             }
         });
 
@@ -85,7 +102,6 @@ public class MainActivity extends AppCompatActivity {
         signaturePad.setMinWidth(SIGNATURE_MIN_STROKE);
         signaturePad.setMaxWidth(SIGNATURE_MAX_STROKE);
         signaturePad.setPenColor(Color.BLACK);
-        signaturePad.clear();
         loadDrawingImage();
     }
 

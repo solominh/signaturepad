@@ -48,10 +48,25 @@
             android:textAllCaps="true"/>
 
         <Button
+            android:id="@+id/btn_redo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Redo"
+            android:textAllCaps="true"/>
+
+
+        <Button
             android:id="@+id/btn_erase"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Erase"
+            android:textAllCaps="true"/>
+
+        <Button
+            android:id="@+id/btn_brush"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Brush"
             android:textAllCaps="true"/>
 
     </LinearLayout>

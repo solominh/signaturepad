@@ -43,16 +43,24 @@ public class SignaturePad extends View {
     private float mVelocityFilterWeight;
     private OnSignedListener mOnSignedListener;
 
-    private Paint mPaint = new Paint();
+    private Paint mDrawingPaint = new Paint();
+
+    // For view
     private Bitmap mSignatureBitmap = null;
+
     private Canvas mSignatureBitmapCanvas = null;
 
-    private List<Path> mPathList = new ArrayList<>();
+    // For added image
     private Bitmap mPreloadBitmap = null;
 
+    // For Erasing function
     private Bitmap mErasureBitmap;
     private Canvas mErasureBitmapCanvas;
     private boolean mIsInEraseMode = false;
+
+    // For undo and redo function
+    private List<Path> mMovePathList = new ArrayList<>();
+    private List<Path> mUndoPathList = new ArrayList<>();
 
     public SignaturePad(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -67,23 +75,23 @@ public class SignaturePad extends View {
             mMinWidth = a.getDimensionPixelSize(R.styleable.SignaturePad_minWidth, convertDpToPx(3));
             mMaxWidth = a.getDimensionPixelSize(R.styleable.SignaturePad_maxWidth, convertDpToPx(7));
             mVelocityFilterWeight = a.getFloat(R.styleable.SignaturePad_velocityFilterWeight, 0.9f);
-            mPaint.setColor(a.getColor(R.styleable.SignaturePad_penColor, Color.BLACK));
+            mDrawingPaint.setColor(a.getColor(R.styleable.SignaturePad_penColor, Color.BLACK));
         } finally {
             a.recycle();
         }
 
         //Fixed parameters
-        mPaint.setAntiAlias(true);
-        mPaint.setStyle(Paint.Style.STROKE);
-        mPaint.setStrokeCap(Paint.Cap.ROUND);
-        mPaint.setStrokeJoin(Paint.Join.ROUND);
+        mDrawingPaint.setAntiAlias(true);
+        mDrawingPaint.setStyle(Paint.Style.STROKE);
+        mDrawingPaint.setStrokeCap(Paint.Cap.ROUND);
+        mDrawingPaint.setStrokeJoin(Paint.Join.ROUND);
 
         //Dirty rectangle to update only the changed portion of the view
         mDirtyRect = new RectF();
 
         clear();
 
-        this.setOnTouchListener(new OnTouchToDraw());
+        this.setOnTouchListener(new OnTouchToDrawSimplePath());
     }
 
     /**
@@ -106,7 +114,7 @@ public class SignaturePad extends View {
      * @param color the color.
      */
     public void setPenColor(int color) {
-        mPaint.setColor(color);
+        mDrawingPaint.setColor(color);
     }
 
     /**
@@ -136,17 +144,14 @@ public class SignaturePad extends View {
         mVelocityFilterWeight = velocityFilterWeight;
     }
 
-    Path drawPath = new Path();
-
-
     @Override
     protected void onDraw(Canvas canvas) {
         if (mSignatureBitmap != null) {
-            canvas.drawBitmap(mSignatureBitmap, 0, 0, mPaint);
+            canvas.drawBitmap(mSignatureBitmap, 0, 0, mDrawingPaint);
         }
 
         if (mIsInEraseMode && mErasureBitmap != null) {
-            canvas.drawBitmap(mErasureBitmap, 0, 0, mPaint);
+            canvas.drawBitmap(mErasureBitmap, 0, 0, mDrawingPaint);
         }
 
     }
@@ -169,26 +174,16 @@ public class SignaturePad extends View {
                     mLastTouchY = eventY;
                     addPoint(new TimedPoint(eventX, eventY));
 
-                    drawPath.moveTo(eventX, eventY);
-
                 case MotionEvent.ACTION_MOVE:
-                    drawPath.lineTo(eventX, eventY);
-
                     resetDirtyRect(eventX, eventY);
                     addPoint(new TimedPoint(eventX, eventY));
                     break;
 
                 case MotionEvent.ACTION_UP:
-                    drawPath.lineTo(eventX, eventY);
-                    mPathList.add(drawPath);
-                    drawPath = new Path();
-
-
                     resetDirtyRect(eventX, eventY);
                     addPoint(new TimedPoint(eventX, eventY));
                     getParent().requestDisallowInterceptTouchEvent(true);
                     setIsEmpty(false);
-
                     break;
 
                 default:
@@ -266,9 +261,105 @@ public class SignaturePad extends View {
         }
     }
 
+    private class OnTouchToDrawSimplePath implements OnTouchListener {
+        private Path mDrawingPath = new Path();
+
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            float touchX = event.getX();
+            float touchY = event.getY();
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    // Move to touching point
+                    mDrawingPath.moveTo(touchX, touchY);
+
+                    // Cache path
+                    mMovePathList.add(mDrawingPath);
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    // Drawing path
+                    mDrawingPath.lineTo(touchX, touchY);
+                    mSignatureBitmapCanvas.drawPath(mDrawingPath, mDrawingPaint);
+                    break;
+                case MotionEvent.ACTION_UP:
+                    // Create new path for array list cache new object (avoid reference error)
+                    mDrawingPath = new Path();
+                    break;
+                default:
+                    return false;
+            }
+            invalidate();
+            return true;
+        }
+    }
+
     //-----------------------------------------------------------------------------
     // Expose methods - hoangminh - 1:46 PM - 1/28/16
     //-----------------------------------------------------------------------------
+
+    public void clearAll(){
+        clear();
+        resetPathList();
+    }
+
+    public void reset() {
+        setSignatureBitmap(mPreloadBitmap);
+        resetPathList();
+    }
+
+    public void undo() {
+        if (mMovePathList.size() <= 0)
+            return;
+
+        // Remove path from move list
+        Path path = mMovePathList.remove(mMovePathList.size() - 1);
+        // Add path to undo list
+        mUndoPathList.add(path);
+
+        drawPathList();
+        invalidate();
+    }
+
+    public void redo() {
+        if (mUndoPathList.size() <= 0)
+            return;
+
+        // Remove path from undo list
+        Path path = mUndoPathList.remove(mUndoPathList.size() - 1);
+        // Add path to remove list
+        mMovePathList.add(path);
+
+        drawPathList();
+        invalidate();
+    }
+
+    public void setErasing(boolean isErasing) {
+        mIsInEraseMode = isErasing;
+
+        if (isErasing)
+            this.setOnTouchListener(new OnTouchToErase());
+        else
+            this.setOnTouchListener(new OnTouchToDrawSimplePath());
+    }
+
+    //-----------------------------------------------------------------------------
+    // Helper - hoangminh - 5:05 PM - 1/28/16
+    //-----------------------------------------------------------------------------
+
+    private void resetPathList(){
+        mMovePathList.clear();
+        mUndoPathList.clear();
+    }
+
+    private void drawPathList() {
+        // Reset bitmap
+        setSignatureBitmap(mPreloadBitmap);
+
+        // Draw path
+        for (Path path : mMovePathList) {
+            mSignatureBitmapCanvas.drawPath(path, mDrawingPaint);
+        }
+    }
 
     public void clear() {
         mPoints = new ArrayList<>();
@@ -283,32 +374,6 @@ public class SignaturePad extends View {
         setIsEmpty(true);
 
         invalidate();
-    }
-
-    public void reset() {
-        setSignatureBitmap(mPreloadBitmap);
-    }
-
-    public void undo() {
-        if (mPathList == null || mPathList.size() <= 0)
-            return;
-        mPathList.remove(mPathList.size() - 1);
-        setSignatureBitmap(mPreloadBitmap);
-
-        for (Path path : mPathList) {
-            mSignatureBitmapCanvas.drawPath(path, mPaint);
-        }
-        invalidate();
-
-    }
-
-    public void setErasing(boolean isErasing) {
-        mIsInEraseMode = isErasing;
-
-        if (isErasing)
-            this.setOnTouchListener(new OnTouchToErase());
-        else
-            this.setOnTouchListener(new OnTouchToDraw());
     }
 
 //-----------------------------------------------------------------------------
@@ -422,7 +487,7 @@ public class SignaturePad extends View {
 
     private void addBezier(Bezier curve, float startWidth, float endWidth) {
         ensureSignatureBitmap();
-        float originalWidth = mPaint.getStrokeWidth();
+        float originalWidth = mDrawingPaint.getStrokeWidth();
         float widthDelta = endWidth - startWidth;
         float drawSteps = (float) Math.floor(curve.length());
 
@@ -446,12 +511,12 @@ public class SignaturePad extends View {
             y += ttt * curve.endPoint.y;
 
             // Set the incremental stroke width and draw.
-            mPaint.setStrokeWidth(startWidth + ttt * widthDelta);
-            mSignatureBitmapCanvas.drawPoint(x, y, mPaint);
+            mDrawingPaint.setStrokeWidth(startWidth + ttt * widthDelta);
+            mSignatureBitmapCanvas.drawPoint(x, y, mDrawingPaint);
             expandDirtyRect(x, y);
         }
 
-        mPaint.setStrokeWidth(originalWidth);
+        mDrawingPaint.setStrokeWidth(originalWidth);
     }
 
     private ControlTimedPoints calculateCurveControlPoints(TimedPoint s1, TimedPoint s2, TimedPoint s3) {
