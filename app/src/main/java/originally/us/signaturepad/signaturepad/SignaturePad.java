@@ -59,8 +59,8 @@ public class SignaturePad extends View {
     private boolean mIsInEraseMode = false;
 
     // For undo and redo function
-    private List<Path> mMovePathList = new ArrayList<>();
-    private List<Path> mUndoPathList = new ArrayList<>();
+    private List<PathAndPaint> mMovePathList = new ArrayList<>();
+    private List<PathAndPaint> mUndoPathList = new ArrayList<>();
 
     public SignaturePad(Context context, AttributeSet attrs) {
         super(context, attrs);
@@ -202,29 +202,16 @@ public class SignaturePad extends View {
     }
 
     private class OnTouchToErase implements OnTouchListener {
-        private Paint mErasePaint = new Paint();
+        private Paint mTempErasePaint;
+
+        private Path mErasePath;
+        private Paint mErasePaint;
+
         private float mPreviousX, mPreviousY;
 
         public OnTouchToErase() {
-            initPaint();
-        }
-
-        private void initPaint() {
-            mErasePaint.setColor(Color.YELLOW);
-            mErasePaint.setAntiAlias(true);
-            mErasePaint.setStyle(Paint.Style.STROKE);
-            mErasePaint.setStrokeCap(Paint.Cap.ROUND);
-            mErasePaint.setStrokeJoin(Paint.Join.ROUND);
-            mErasePaint.setStrokeWidth(30);
-        }
-
-        private void enableClearMode() {
-            PorterDuffXfermode porterDuffXfermode = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
-            mErasePaint.setXfermode(porterDuffXfermode);
-        }
-
-        private void disableClearMode() {
-            mErasePaint.setXfermode(null);
+            mTempErasePaint = createNewTempErasePaint();
+            mErasePaint = createNewErasePaint();
         }
 
         @Override
@@ -234,21 +221,31 @@ public class SignaturePad extends View {
 
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
+                    // Create path and paint
+                    // Create new path for array list cache new object (avoid reference error)
+                    mErasePath = new Path();
+
+                    // Cache path and paint
+                    PathAndPaint pathAndPaint = new PathAndPaint(mErasePath, mErasePaint);
+                    mMovePathList.add(pathAndPaint);
+
                     getParent().requestDisallowInterceptTouchEvent(true);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
-                    disableClearMode();
                     createNewErasureBitmap();
+
+                    mErasePath.moveTo(eventX, eventY);
                     break;
 
                 case MotionEvent.ACTION_MOVE:
-                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mErasePaint);
+                    mErasePath.lineTo(eventX, eventY);
+
+                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mTempErasePaint);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
                     break;
 
                 case MotionEvent.ACTION_UP:
-                    enableClearMode();
                     mSignatureBitmapCanvas.drawBitmap(mErasureBitmap, 0, 0, mErasePaint);
                     mErasureBitmap = null;
                     break;
@@ -262,28 +259,44 @@ public class SignaturePad extends View {
     }
 
     private class OnTouchToDrawSimplePath implements OnTouchListener {
-        private Path mDrawingPath = new Path();
+        private Path mDrawingPath;
+        private Paint mDrawingPaint;
+        private float mPreviousX, mPreviousY;
 
         @Override
         public boolean onTouch(View v, MotionEvent event) {
-            float touchX = event.getX();
-            float touchY = event.getY();
+            float eventX = event.getX();
+            float eventY = event.getY();
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Move to touching point
-                    mDrawingPath.moveTo(touchX, touchY);
-
-                    // Cache path
-                    mMovePathList.add(mDrawingPath);
-                    break;
-                case MotionEvent.ACTION_MOVE:
-                    // Drawing path
-                    mDrawingPath.lineTo(touchX, touchY);
-                    mSignatureBitmapCanvas.drawPath(mDrawingPath, mDrawingPaint);
-                    break;
-                case MotionEvent.ACTION_UP:
+                    // Create path and paint
                     // Create new path for array list cache new object (avoid reference error)
                     mDrawingPath = new Path();
+                    mDrawingPaint = createNewDrawingPaint();
+
+                    // Cache path and paint
+                    PathAndPaint pathAndPaint = new PathAndPaint(mDrawingPath, mDrawingPaint);
+                    mMovePathList.add(pathAndPaint);
+
+                    // Move to touching point
+                    mDrawingPath.moveTo(eventX, eventY);
+
+                    // Cache
+                    mPreviousX = eventX;
+                    mPreviousY = eventY;
+                    break;
+
+                case MotionEvent.ACTION_MOVE:
+                    // Drawing path
+                    mDrawingPath.lineTo(eventX, eventY);
+                    mSignatureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mDrawingPaint);
+
+                    // Cache
+                    mPreviousX = eventX;
+                    mPreviousY = eventY;
+                    break;
+
+                case MotionEvent.ACTION_UP:
                     break;
                 default:
                     return false;
@@ -297,7 +310,7 @@ public class SignaturePad extends View {
     // Expose methods - hoangminh - 1:46 PM - 1/28/16
     //-----------------------------------------------------------------------------
 
-    public void clearAll(){
+    public void clearAll() {
         clear();
         resetPathList();
     }
@@ -312,9 +325,9 @@ public class SignaturePad extends View {
             return;
 
         // Remove path from move list
-        Path path = mMovePathList.remove(mMovePathList.size() - 1);
+        PathAndPaint pathAndPaint = mMovePathList.remove(mMovePathList.size() - 1);
         // Add path to undo list
-        mUndoPathList.add(path);
+        mUndoPathList.add(pathAndPaint);
 
         drawPathList();
         invalidate();
@@ -325,9 +338,9 @@ public class SignaturePad extends View {
             return;
 
         // Remove path from undo list
-        Path path = mUndoPathList.remove(mUndoPathList.size() - 1);
+        PathAndPaint pathAndPaint = mUndoPathList.remove(mUndoPathList.size() - 1);
         // Add path to remove list
-        mMovePathList.add(path);
+        mMovePathList.add(pathAndPaint);
 
         drawPathList();
         invalidate();
@@ -346,7 +359,7 @@ public class SignaturePad extends View {
     // Helper - hoangminh - 5:05 PM - 1/28/16
     //-----------------------------------------------------------------------------
 
-    private void resetPathList(){
+    private void resetPathList() {
         mMovePathList.clear();
         mUndoPathList.clear();
     }
@@ -356,8 +369,8 @@ public class SignaturePad extends View {
         setSignatureBitmap(mPreloadBitmap);
 
         // Draw path
-        for (Path path : mMovePathList) {
-            mSignatureBitmapCanvas.drawPath(path, mDrawingPaint);
+        for (PathAndPaint model : mMovePathList) {
+            mSignatureBitmapCanvas.drawPath(model.path, model.paint);
         }
     }
 
@@ -375,6 +388,34 @@ public class SignaturePad extends View {
 
         invalidate();
     }
+
+    private Paint createNewDrawingPaint() {
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setColor(Color.BLACK);
+        paint.setStrokeWidth(8f);
+        return paint;
+    }
+
+    private Paint createNewTempErasePaint() {
+        Paint paint = createNewDrawingPaint();
+        paint.setStrokeWidth(30);
+        paint.setColor(Color.YELLOW);
+
+        return paint;
+    }
+
+    private Paint createNewErasePaint() {
+        Paint paint = createNewTempErasePaint();
+        PorterDuffXfermode porterDuffXfermode = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
+        paint.setXfermode(porterDuffXfermode);
+
+        return paint;
+    }
+
 
 //-----------------------------------------------------------------------------
 // Listener - hoangminh - 1:46 PM - 1/28/16
