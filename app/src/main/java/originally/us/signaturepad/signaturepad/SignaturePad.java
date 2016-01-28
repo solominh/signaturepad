@@ -50,6 +50,10 @@ public class SignaturePad extends View {
     private List<Path> mPathList = new ArrayList<>();
     private Bitmap mPreloadBitmap = null;
 
+    private Bitmap mErasureBitmap;
+    private Canvas mErasureBitmapCanvas;
+    private boolean mIsInEraseMode = false;
+
     public SignaturePad(Context context, AttributeSet attrs) {
         super(context, attrs);
 
@@ -140,6 +144,11 @@ public class SignaturePad extends View {
         if (mSignatureBitmap != null) {
             canvas.drawBitmap(mSignatureBitmap, 0, 0, mPaint);
         }
+
+        if (mIsInEraseMode && mErasureBitmap != null) {
+            canvas.drawBitmap(mErasureBitmap, 0, 0, mPaint);
+        }
+
     }
 
     //-----------------------------------------------------------------------------
@@ -206,15 +215,21 @@ public class SignaturePad extends View {
         }
 
         private void initPaint() {
-            mErasePaint.setColor(Color.TRANSPARENT);
+            mErasePaint.setColor(Color.YELLOW);
             mErasePaint.setAntiAlias(true);
             mErasePaint.setStyle(Paint.Style.STROKE);
             mErasePaint.setStrokeCap(Paint.Cap.ROUND);
             mErasePaint.setStrokeJoin(Paint.Join.ROUND);
             mErasePaint.setStrokeWidth(30);
+        }
 
-            PorterDuffXfermode porterDuffXfermode = new PorterDuffXfermode(PorterDuff.Mode.CLEAR);
+        private void enableClearMode() {
+            PorterDuffXfermode porterDuffXfermode = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
             mErasePaint.setXfermode(porterDuffXfermode);
+        }
+
+        private void disableClearMode() {
+            mErasePaint.setXfermode(null);
         }
 
         @Override
@@ -227,15 +242,20 @@ public class SignaturePad extends View {
                     getParent().requestDisallowInterceptTouchEvent(true);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
+                    disableClearMode();
+                    createNewErasureBitmap();
                     break;
 
                 case MotionEvent.ACTION_MOVE:
-                    mSignatureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mErasePaint);
+                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mErasePaint);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
                     break;
 
                 case MotionEvent.ACTION_UP:
+                    enableClearMode();
+                    mSignatureBitmapCanvas.drawBitmap(mErasureBitmap, 0, 0, mErasePaint);
+                    mErasureBitmap = null;
                     break;
 
                 default:
@@ -283,20 +303,23 @@ public class SignaturePad extends View {
     }
 
     public void setErasing(boolean isErasing) {
+        mIsInEraseMode = isErasing;
+
         if (isErasing)
             this.setOnTouchListener(new OnTouchToErase());
         else
             this.setOnTouchListener(new OnTouchToDraw());
     }
 
-    //-----------------------------------------------------------------------------
-    // Listener - hoangminh - 1:46 PM - 1/28/16
-    //-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Listener - hoangminh - 1:46 PM - 1/28/16
+//-----------------------------------------------------------------------------
 
     public interface OnSignedListener {
         void onSigned();
 
         void onClear();
+
     }
 
     public void setOnSignedListener(OnSignedListener listener) {
@@ -509,6 +532,11 @@ public class SignaturePad extends View {
             return;
         mSignatureBitmap = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
         mSignatureBitmapCanvas = new Canvas(mSignatureBitmap);
+    }
+
+    private void createNewErasureBitmap() {
+        mErasureBitmap = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
+        mErasureBitmapCanvas = new Canvas(mErasureBitmap);
     }
 
     private int convertDpToPx(float dp) {
