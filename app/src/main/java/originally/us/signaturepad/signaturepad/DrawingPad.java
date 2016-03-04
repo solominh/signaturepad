@@ -87,7 +87,7 @@ public class DrawingPad extends View implements DrawingOptions {
         }
 
         if (mIsInEraseMode && mErasingBitmap != null) {
-            canvas.drawBitmap(mErasingBitmap, 0, 0, mDrawingPaint);
+            canvas.drawBitmap(mErasingBitmap, 0, 0, mFillErasingPaint);
         }
     }
 
@@ -366,6 +366,7 @@ public class DrawingPad extends View implements DrawingOptions {
     //-----------------------------------------------------------------------------
     //- Set bitmap - hoangminh - 12:20 PM - 3/4/16
 
+    // Warning: must wait for bitmap width and height available => ViewTreeObserver
     public void setPreloadBitmap(Bitmap bitmap) {
         // Sanity check
         if (bitmap == null)
