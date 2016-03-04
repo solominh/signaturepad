@@ -17,7 +17,6 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.util.AttributeSet;
-import android.util.DisplayMetrics;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -72,8 +71,8 @@ public class SignaturePad extends View {
 
         //Configurable parameters
         try {
-            mMinWidth = a.getDimensionPixelSize(R.styleable.SignaturePad_minWidth, convertDpToPx(3));
-            mMaxWidth = a.getDimensionPixelSize(R.styleable.SignaturePad_maxWidth, convertDpToPx(7));
+            mMinWidth = a.getDimensionPixelSize(R.styleable.SignaturePad_minWidth, dp2px(3));
+            mMaxWidth = a.getDimensionPixelSize(R.styleable.SignaturePad_maxWidth, dp2px(7));
             mVelocityFilterWeight = a.getFloat(R.styleable.SignaturePad_velocityFilterWeight, 0.9f);
             mDrawingPaint.setColor(a.getColor(R.styleable.SignaturePad_penColor, Color.BLACK));
         } finally {
@@ -123,7 +122,7 @@ public class SignaturePad extends View {
      * @param minWidth the width in dp.
      */
     public void setMinWidth(float minWidth) {
-        mMinWidth = convertDpToPx(minWidth);
+        mMinWidth = dp2px(minWidth);
     }
 
     /**
@@ -132,7 +131,7 @@ public class SignaturePad extends View {
      * @param maxWidth the width in dp.
      */
     public void setMaxWidth(float maxWidth) {
-        mMaxWidth = convertDpToPx(maxWidth);
+        mMaxWidth = dp2px(maxWidth);
     }
 
     /**
@@ -645,8 +644,8 @@ public class SignaturePad extends View {
         mErasureBitmapCanvas = new Canvas(mErasureBitmap);
     }
 
-    private int convertDpToPx(float dp) {
-        return Math.round(dp * (getResources().getDisplayMetrics().xdpi / DisplayMetrics.DENSITY_DEFAULT));
+    private int dp2px(float dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
 }
