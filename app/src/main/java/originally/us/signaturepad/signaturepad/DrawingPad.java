@@ -32,17 +32,17 @@ public class DrawingPad extends View implements DrawingOptions {
     private Canvas mDrawingBitmapCanvas = null;
 
     // For Erasing function
-    private Bitmap mErasureBitmap;
-    private Canvas mErasureBitmapCanvas;
+    private Bitmap mErasingBitmap;
+    private Canvas mErasingBitmapCanvas;
     private boolean mIsInEraseMode = false;
 
     // For added image
     private Bitmap mPreloadBitmap = null;
 
     // Paint
-    private Paint mDrawingPaint = createNewDrawingPaint(null);
-    private Paint mErasingPaint = createNewErasingPaint(null);
-    private Paint mFillErasingPaint = createNewFillErasingPaint(null);
+    private Paint mDrawingPaint;
+    private Paint mErasingPaint;
+    private Paint mFillErasingPaint;
 
     // For undo and redo function
     private List<PathAndPaint> mMovePathList = new ArrayList<>();
@@ -55,6 +55,11 @@ public class DrawingPad extends View implements DrawingOptions {
     public DrawingPad(Context context, AttributeSet attrs) {
         super(context, attrs);
 
+        // Init Paint
+        mDrawingPaint = createNewDrawingPaint(null);
+        mErasingPaint = createNewErasingPaint(null);
+        mFillErasingPaint = createNewFillErasingPaint(null);
+
         // Configurable parameters
         TypedArray a = context.getTheme().obtainStyledAttributes(attrs, R.styleable.DrawingPad, 0, 0);
         try {
@@ -66,9 +71,6 @@ public class DrawingPad extends View implements DrawingOptions {
         } finally {
             a.recycle();
         }
-
-        // Reset
-        clear();
 
         // Drawing
         this.setOnTouchListener(new OnTouchToDrawSimplePath());
@@ -84,8 +86,8 @@ public class DrawingPad extends View implements DrawingOptions {
             canvas.drawBitmap(mDrawingBitmap, 0, 0, mDrawingPaint);
         }
 
-        if (mIsInEraseMode && mErasureBitmap != null) {
-            canvas.drawBitmap(mErasureBitmap, 0, 0, mDrawingPaint);
+        if (mIsInEraseMode && mErasingBitmap != null) {
+            canvas.drawBitmap(mErasingBitmap, 0, 0, mDrawingPaint);
         }
     }
 
@@ -104,7 +106,6 @@ public class DrawingPad extends View implements DrawingOptions {
             float eventY = event.getY();
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Create path and paint
                     // Create new path for array list cache new object (avoid reference error)
                     mDrawingPath = new Path();
 
@@ -118,6 +119,8 @@ public class DrawingPad extends View implements DrawingOptions {
                     // Cache
                     mPreviousX = eventX;
                     mPreviousY = eventY;
+
+                    ensureDrawingBitmap();
                     break;
 
                 case MotionEvent.ACTION_MOVE:
@@ -153,7 +156,6 @@ public class DrawingPad extends View implements DrawingOptions {
 
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Create path and paint
                     // Create new path for array list cache new object (avoid reference error)
                     mErasePath = new Path();
 
@@ -164,7 +166,7 @@ public class DrawingPad extends View implements DrawingOptions {
                     getParent().requestDisallowInterceptTouchEvent(true);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
-                    createNewErasureBitmap();
+                    ensureErasingBitmap();
 
                     mErasePath.moveTo(eventX, eventY);
                     break;
@@ -172,14 +174,14 @@ public class DrawingPad extends View implements DrawingOptions {
                 case MotionEvent.ACTION_MOVE:
                     mErasePath.lineTo(eventX, eventY);
 
-                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mFillErasingPaint);
+                    mErasingBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mFillErasingPaint);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
                     break;
 
                 case MotionEvent.ACTION_UP:
-                    mDrawingBitmapCanvas.drawBitmap(mErasureBitmap, 0, 0, mErasingPaint);
-                    mErasureBitmap = null;
+                    mDrawingBitmapCanvas.drawBitmap(mErasingBitmap, 0, 0, mErasingPaint);
+                    mErasingBitmap = null;
                     break;
 
                 default:
@@ -196,20 +198,14 @@ public class DrawingPad extends View implements DrawingOptions {
 
     @Override
     public void clear() {
-        if (mDrawingBitmap != null) {
-            mDrawingBitmap = null;
-            ensureDrawingBitmap();
-        }
-
-        mMovePathList.clear();
-        mUndoPathList.clear();
-
-        invalidate();
+        removeDrawingBitmap();
+        resetPathList();
     }
 
     @Override
     public void reset() {
-        setDrawingBitmap(mPreloadBitmap);
+        setPreloadBitmap(mPreloadBitmap);
+        resetPathList();
     }
 
     @Override
@@ -264,12 +260,6 @@ public class DrawingPad extends View implements DrawingOptions {
         this.setOnTouchListener(new OnTouchToDrawSimplePath());
     }
 
-    private void applySetting(Paint paint, int strokeWidth, @ColorRes int strokeColor) {
-        if (strokeWidth > 0)
-            paint.setStrokeWidth(strokeWidth);
-        if (strokeColor > 0)
-            paint.setColor(getResources().getColor(strokeColor));
-    }
 
     //-----------------------------------------------------------------------------
     // Helper - hoangminh - 5:05 PM - 1/28/16
@@ -277,12 +267,33 @@ public class DrawingPad extends View implements DrawingOptions {
 
     private void drawPathList() {
         // Reset bitmap
-        setDrawingBitmap(mPreloadBitmap);
+        setPreloadBitmap(mPreloadBitmap);
 
         // Draw path
         for (PathAndPaint model : mMovePathList) {
             mDrawingBitmapCanvas.drawPath(model.path, model.paint);
         }
+    }
+
+    private void applySetting(Paint paint, int strokeWidth, @ColorRes int strokeColor) {
+        if (strokeWidth > 0)
+            paint.setStrokeWidth(strokeWidth);
+        if (strokeColor > 0)
+            paint.setColor(getResources().getColor(strokeColor));
+    }
+
+    private void resetPathList() {
+        mMovePathList.clear();
+        mUndoPathList.clear();
+    }
+
+    private void removeDrawingBitmap() {
+        if (mDrawingBitmap != null) {
+            mDrawingBitmap = null;
+            mDrawingBitmapCanvas = null;
+        }
+
+        invalidate();
     }
 
     //-----------------------------------------------------------------------------
@@ -308,8 +319,8 @@ public class DrawingPad extends View implements DrawingOptions {
 
     private Paint createNewFillErasingPaint(Paint oldPaint) {
         Paint paint = createPaint();
-        float strokeWidth = oldPaint == null || oldPaint.getStrokeWidth() <= 0 ? dp2px(5) : oldPaint.getStrokeWidth();
-        int color = oldPaint == null || oldPaint.getColor() == 0 ? Color.RED : oldPaint.getColor();
+        float strokeWidth = oldPaint == null || oldPaint.getStrokeWidth() <= 0 ? dp2px(30) : oldPaint.getStrokeWidth();
+        int color = oldPaint == null || oldPaint.getColor() == 0 ? Color.YELLOW : oldPaint.getColor();
         paint.setStrokeWidth(strokeWidth);
         paint.setColor(color);
 
@@ -333,18 +344,18 @@ public class DrawingPad extends View implements DrawingOptions {
     //-----------------------------------------------------------------------------
     //- Get bitmap - hoangminh - 12:20 PM - 3/4/16
 
-    public Bitmap getTransparentDrawingBitmap() {
+    public Bitmap getTransparentBitmap() {
         ensureDrawingBitmap();
         return mDrawingBitmap;
     }
 
     public Bitmap getTrimBitmap() {
-        Bitmap transparentBitmap = getTransparentDrawingBitmap();
+        Bitmap transparentBitmap = getTransparentBitmap();
         return BitmapUtils.trimBitmap(transparentBitmap);
     }
 
-    public Bitmap getWithBgDrawingBitmap(@ColorInt int bgColor) {
-        Bitmap originalBitmap = getTransparentDrawingBitmap();
+    public Bitmap getBitmapWithBackgroundColor(@ColorInt int bgColor) {
+        Bitmap originalBitmap = getTransparentBitmap();
         Bitmap whiteBgBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(whiteBgBitmap);
         canvas.drawColor(bgColor);
@@ -355,7 +366,7 @@ public class DrawingPad extends View implements DrawingOptions {
     //-----------------------------------------------------------------------------
     //- Set bitmap - hoangminh - 12:20 PM - 3/4/16
 
-    public void setDrawingBitmap(Bitmap bitmap) {
+    public void setPreloadBitmap(Bitmap bitmap) {
         // Sanity check
         if (bitmap == null)
             return;
@@ -363,6 +374,7 @@ public class DrawingPad extends View implements DrawingOptions {
         // Clear bitmap
         mPreloadBitmap = bitmap;
         clear();
+        ensureDrawingBitmap();
 
         // Get drawMatrix
         RectF tempSrc = new RectF();
@@ -397,9 +409,11 @@ public class DrawingPad extends View implements DrawingOptions {
         mDrawingBitmapCanvas = new Canvas(mDrawingBitmap);
     }
 
-    private void createNewErasureBitmap() {
-        mErasureBitmap = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
-        mErasureBitmapCanvas = new Canvas(mErasureBitmap);
+    private void ensureErasingBitmap() {
+        if (mErasingBitmap != null)
+            return;
+        mErasingBitmap = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
+        mErasingBitmapCanvas = new Canvas(mErasingBitmap);
     }
 
     private int dp2px(float dp) {
