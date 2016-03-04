@@ -199,12 +199,14 @@ public class DrawingPad extends View implements DrawingOptions {
     @Override
     public void clear() {
         removeDrawingBitmap();
+        removeErasingBitmap();
         resetPathList();
     }
 
     @Override
     public void reset() {
         setPreloadBitmap(mPreloadBitmap);
+        removeErasingBitmap();
         resetPathList();
     }
 
@@ -291,6 +293,15 @@ public class DrawingPad extends View implements DrawingOptions {
         if (mDrawingBitmap != null) {
             mDrawingBitmap = null;
             mDrawingBitmapCanvas = null;
+        }
+
+        invalidate();
+    }
+
+    private void removeErasingBitmap() {
+        if (mErasingBitmap != null) {
+            mErasingBitmap = null;
+            mErasingBitmapCanvas = null;
         }
 
         invalidate();
