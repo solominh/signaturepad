@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.Button;
 
 import originally.us.originally.us.signaturepad.signaturepad.R;
+import originally.us.signaturepad.signaturepad.BitmapUtils;
 import originally.us.signaturepad.signaturepad.DrawingPad;
 
 public class DrawingPadActivity extends AppCompatActivity {
@@ -37,6 +38,7 @@ public class DrawingPadActivity extends AppCompatActivity {
 
         mBtnBrush = (Button) findViewById(R.id.btn_brush);
         mBtnErase = (Button) findViewById(R.id.btn_erase);
+
     }
 
     protected void bindData() {
@@ -108,7 +110,8 @@ public class DrawingPadActivity extends AppCompatActivity {
     }
 
     private void saveDrawingImage() {
-
+        Bitmap bitmap = mDrawingPad.getTransparentBitmap();
+        BitmapUtils.trimBitmap(bitmap);
     }
 
 }
