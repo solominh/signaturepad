@@ -87,7 +87,7 @@ public class DrawingPad extends View implements DrawingOptions {
         }
 
         if (mIsInEraseMode && mErasingBitmap != null) {
-            canvas.drawBitmap(mErasingBitmap, 0, 0, mFillErasingPaint);
+            canvas.drawBitmap(mErasingBitmap, 0, 0, mDrawingPaint);
         }
     }
 
@@ -374,7 +374,7 @@ public class DrawingPad extends View implements DrawingOptions {
 
         // Clear bitmap
         mPreloadBitmap = bitmap;
-        clear();
+        removeDrawingBitmap();
         ensureDrawingBitmap();
 
         // Get drawMatrix
