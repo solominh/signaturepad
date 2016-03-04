@@ -8,4 +8,9 @@
         <attr name="velocityFilterWeight" format="float" />
     </declare-styleable>
 
+    <declare-styleable name="DrawingPad">
+        <attr name="stroke_width" format="dimension" />
+        <attr name="stroke_color" format="color" />
+    </declare-styleable>
+
 </resources>
