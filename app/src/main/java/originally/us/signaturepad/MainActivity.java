@@ -16,10 +16,10 @@ public class MainActivity extends AppCompatActivity {
     public static final float SIGNATURE_MIN_STROKE = 2f;
     public static final float SIGNATURE_MAX_STROKE = 4f;
 
-    private SignaturePad signaturePad;
-    private Button btnClear, btnSave, btnReset;
-    private Button btnUndo, btnRedo;
-    private Button btnErase, btnBrush;
+    private SignaturePad mSignaturePad;
+    private Button mBtnClear, mBtnSave, mBtnReset;
+    private Button mBtnUndo, mBtnRedo;
+    private Button mBtnErase, mBtnBrush;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,29 +30,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     protected void initUi() {
-        signaturePad = (SignaturePad) findViewById(R.id.signature_pad);
-        btnClear = (Button) findViewById(R.id.btn_clear);
-        btnSave = (Button) findViewById(R.id.btn_save);
-        btnReset = (Button) findViewById(R.id.btn_reset);
+        mSignaturePad = (SignaturePad) findViewById(R.id.signature_pad);
 
-        btnUndo = (Button) findViewById(R.id.btn_undo);
-        btnRedo = (Button) findViewById(R.id.btn_redo);
+        mBtnClear = (Button) findViewById(R.id.btn_clear);
+        mBtnSave = (Button) findViewById(R.id.btn_save);
+        mBtnReset = (Button) findViewById(R.id.btn_reset);
 
-        btnBrush = (Button) findViewById(R.id.btn_brush);
-        btnErase = (Button) findViewById(R.id.btn_erase);
+        mBtnUndo = (Button) findViewById(R.id.btn_undo);
+        mBtnRedo = (Button) findViewById(R.id.btn_redo);
+
+        mBtnBrush = (Button) findViewById(R.id.btn_brush);
+        mBtnErase = (Button) findViewById(R.id.btn_erase);
     }
 
     protected void bindData() {
-        signaturePad.setVelocityFilterWeight(10);
+        mSignaturePad.setVelocityFilterWeight(10);
 
-        btnClear.setOnClickListener(new View.OnClickListener() {
+        mBtnClear.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                signaturePad.clearAll();
+                mSignaturePad.clear();
             }
         });
 
-        btnSave.setOnClickListener(new View.OnClickListener() {
+        mBtnSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 saveDrawingImage();
@@ -60,38 +61,38 @@ public class MainActivity extends AppCompatActivity {
         });
 
 
-        btnReset.setOnClickListener(new View.OnClickListener() {
+        mBtnReset.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                signaturePad.reset();
+                mSignaturePad.reset();
             }
         });
 
-        btnUndo.setOnClickListener(new View.OnClickListener() {
+        mBtnUndo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                signaturePad.undo();
+                mSignaturePad.undo();
             }
         });
 
-        btnRedo.setOnClickListener(new View.OnClickListener() {
+        mBtnRedo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                signaturePad.redo();
+                mSignaturePad.redo();
             }
         });
 
-        btnErase.setOnClickListener(new View.OnClickListener() {
+        mBtnErase.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                signaturePad.setErasing(true);
+                mSignaturePad.setErasing(true);
             }
         });
 
-        btnBrush.setOnClickListener(new View.OnClickListener() {
+        mBtnBrush.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                signaturePad.setErasing(false);
+                mSignaturePad.setErasing(false);
             }
         });
 
@@ -99,24 +100,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initSignaturePad() {
-        signaturePad.setMinWidth(SIGNATURE_MIN_STROKE);
-        signaturePad.setMaxWidth(SIGNATURE_MAX_STROKE);
-        signaturePad.setPenColor(Color.BLACK);
+        mSignaturePad.setMinWidth(SIGNATURE_MIN_STROKE);
+        mSignaturePad.setMaxWidth(SIGNATURE_MAX_STROKE);
+        mSignaturePad.setPenColor(Color.BLACK);
         loadDrawingImage();
     }
 
     private void loadDrawingImage() {
-        signaturePad.post(new Runnable() {
+        mSignaturePad.post(new Runnable() {
             @Override
             public void run() {
                 Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
-                signaturePad.setSignatureBitmap(bitmap);
+                mSignaturePad.setSignatureBitmap(bitmap);
             }
         });
     }
 
     private void saveDrawingImage() {
-
+        Bitmap bitmap = mSignaturePad.getTrimBitmap();
     }
 
 }

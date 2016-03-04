@@ -16,6 +16,7 @@ import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
+import android.support.annotation.ColorRes;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -26,7 +27,8 @@ import java.util.List;
 import originally.us.originally.us.signaturepad.signaturepad.R;
 
 
-public class SignaturePad extends View {
+public class SignaturePad extends View implements DrawingOptions {
+
     //View state
     private List<TimedPoint> mPoints;
     private boolean mIsEmpty;
@@ -42,11 +44,8 @@ public class SignaturePad extends View {
     private float mVelocityFilterWeight;
     private OnSignedListener mOnSignedListener;
 
-    private Paint mDrawingPaint = new Paint();
-
     // For view
     private Bitmap mSignatureBitmap = null;
-
     private Canvas mSignatureBitmapCanvas = null;
 
     // For added image
@@ -57,12 +56,22 @@ public class SignaturePad extends View {
     private Canvas mErasureBitmapCanvas;
     private boolean mIsInEraseMode = false;
 
+    // Paint
+    private Paint mDrawingPaint;
+    private Paint mErasingPaint;
+    private Paint mFillErasingPaint;
+
     // For undo and redo function
     private List<PathAndPaint> mMovePathList = new ArrayList<>();
     private List<PathAndPaint> mUndoPathList = new ArrayList<>();
 
     public SignaturePad(Context context, AttributeSet attrs) {
         super(context, attrs);
+
+        // Init Paint
+        mDrawingPaint = createNewDrawingPaint(null);
+        mErasingPaint = createNewErasingPaint(null);
+        mFillErasingPaint = createNewFillErasingPaint(null);
 
         TypedArray a = context.getTheme().obtainStyledAttributes(
                 attrs,
@@ -79,18 +88,12 @@ public class SignaturePad extends View {
             a.recycle();
         }
 
-        //Fixed parameters
-        mDrawingPaint.setAntiAlias(true);
-        mDrawingPaint.setStyle(Paint.Style.STROKE);
-        mDrawingPaint.setStrokeCap(Paint.Cap.ROUND);
-        mDrawingPaint.setStrokeJoin(Paint.Join.ROUND);
-
         //Dirty rectangle to update only the changed portion of the view
         mDirtyRect = new RectF();
 
-        clear();
+        removeSignaturePad();
 
-        this.setOnTouchListener(new OnTouchToDrawSimplePath());
+        this.setOnTouchListener(new OnTouchToDraw());
     }
 
     /**
@@ -201,17 +204,8 @@ public class SignaturePad extends View {
     }
 
     private class OnTouchToErase implements OnTouchListener {
-        private Paint mTempErasePaint;
-
         private Path mErasePath;
-        private Paint mErasePaint;
-
         private float mPreviousX, mPreviousY;
-
-        public OnTouchToErase() {
-            mTempErasePaint = createNewTempErasePaint();
-            mErasePaint = createNewErasePaint();
-        }
 
         @Override
         public boolean onTouch(View v, MotionEvent event) {
@@ -225,7 +219,7 @@ public class SignaturePad extends View {
                     mErasePath = new Path();
 
                     // Cache path and paint
-                    PathAndPaint pathAndPaint = new PathAndPaint(mErasePath, mErasePaint);
+                    PathAndPaint pathAndPaint = new PathAndPaint(mErasePath, mErasingPaint);
                     mMovePathList.add(pathAndPaint);
 
                     getParent().requestDisallowInterceptTouchEvent(true);
@@ -239,64 +233,16 @@ public class SignaturePad extends View {
                 case MotionEvent.ACTION_MOVE:
                     mErasePath.lineTo(eventX, eventY);
 
-                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mTempErasePaint);
+                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mFillErasingPaint);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
                     break;
 
                 case MotionEvent.ACTION_UP:
-                    mSignatureBitmapCanvas.drawBitmap(mErasureBitmap, 0, 0, mErasePaint);
+                    mSignatureBitmapCanvas.drawBitmap(mErasureBitmap, 0, 0, mErasingPaint);
                     mErasureBitmap = null;
                     break;
 
-                default:
-                    return false;
-            }
-            invalidate();
-            return true;
-        }
-    }
-
-    private class OnTouchToDrawSimplePath implements OnTouchListener {
-        private Path mDrawingPath;
-        private Paint mDrawingPaint;
-        private float mPreviousX, mPreviousY;
-
-        @Override
-        public boolean onTouch(View v, MotionEvent event) {
-            float eventX = event.getX();
-            float eventY = event.getY();
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    // Create path and paint
-                    // Create new path for array list cache new object (avoid reference error)
-                    mDrawingPath = new Path();
-                    mDrawingPaint = createNewDrawingPaint();
-
-                    // Cache path and paint
-                    PathAndPaint pathAndPaint = new PathAndPaint(mDrawingPath, mDrawingPaint);
-                    mMovePathList.add(pathAndPaint);
-
-                    // Move to touching point
-                    mDrawingPath.moveTo(eventX, eventY);
-
-                    // Cache
-                    mPreviousX = eventX;
-                    mPreviousY = eventY;
-                    break;
-
-                case MotionEvent.ACTION_MOVE:
-                    // Drawing path
-                    mDrawingPath.lineTo(eventX, eventY);
-                    mSignatureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mDrawingPaint);
-
-                    // Cache
-                    mPreviousX = eventX;
-                    mPreviousY = eventY;
-                    break;
-
-                case MotionEvent.ACTION_UP:
-                    break;
                 default:
                     return false;
             }
@@ -309,16 +255,19 @@ public class SignaturePad extends View {
     // Expose methods - hoangminh - 1:46 PM - 1/28/16
     //-----------------------------------------------------------------------------
 
-    public void clearAll() {
-        clear();
+    @Override
+    public void clear() {
+        removeSignaturePad();
         resetPathList();
     }
 
+    @Override
     public void reset() {
         setSignatureBitmap(mPreloadBitmap);
         resetPathList();
     }
 
+    @Override
     public void undo() {
         if (mMovePathList.size() <= 0)
             return;
@@ -332,6 +281,7 @@ public class SignaturePad extends View {
         invalidate();
     }
 
+    @Override
     public void redo() {
         if (mUndoPathList.size() <= 0)
             return;
@@ -351,7 +301,31 @@ public class SignaturePad extends View {
         if (isErasing)
             this.setOnTouchListener(new OnTouchToErase());
         else
-            this.setOnTouchListener(new OnTouchToDrawSimplePath());
+            this.setOnTouchListener(new OnTouchToDraw());
+    }
+
+    @Override
+    public void enableErasingMode(int strokeWidth, @ColorRes int strokeColor) {
+        if (strokeWidth > 0 || strokeColor > 0) {
+            mErasingPaint = createNewErasingPaint(mErasingPaint);
+            mFillErasingPaint = createNewFillErasingPaint(mFillErasingPaint);
+            applySetting(mErasingPaint, strokeWidth, strokeColor);
+            applySetting(mFillErasingPaint, strokeWidth, strokeColor);
+        }
+
+        mIsInEraseMode = true;
+        this.setOnTouchListener(new OnTouchToErase());
+    }
+
+    @Override
+    public void enableDrawingMode(int strokeWidth, @ColorRes int strokeColor) {
+        if (strokeWidth > 0 || strokeColor > 0) {
+            mDrawingPaint = createNewDrawingPaint(mDrawingPaint);
+            applySetting(mDrawingPaint, strokeWidth, strokeColor);
+        }
+
+        mIsInEraseMode = false;
+        this.setOnTouchListener(new OnTouchToDraw());
     }
 
     //-----------------------------------------------------------------------------
@@ -373,7 +347,14 @@ public class SignaturePad extends View {
         }
     }
 
-    public void clear() {
+    private void applySetting(Paint paint, int strokeWidth, @ColorRes int strokeColor) {
+        if (strokeWidth > 0)
+            paint.setStrokeWidth(strokeWidth);
+        if (strokeColor > 0)
+            paint.setColor(getResources().getColor(strokeColor));
+    }
+
+    public void removeSignaturePad() {
         mPoints = new ArrayList<>();
         mLastVelocity = 0;
         mLastWidth = (mMinWidth + mMaxWidth) / 2;
@@ -388,37 +369,50 @@ public class SignaturePad extends View {
         invalidate();
     }
 
-    private Paint createNewDrawingPaint() {
+    //-----------------------------------------------------------------------------
+    //- Drawing paint - hoangminh - 3:27 PM - 3/4/16
+
+    private Paint createPaint() {
         Paint paint = new Paint();
         paint.setAntiAlias(true);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
-        paint.setColor(Color.BLACK);
-        paint.setStrokeWidth(8f);
         return paint;
     }
 
-    private Paint createNewTempErasePaint() {
-        Paint paint = createNewDrawingPaint();
-        paint.setStrokeWidth(30);
-        paint.setColor(Color.YELLOW);
+    private Paint createNewDrawingPaint(Paint oldPaint) {
+        Paint paint = createPaint();
+        float strokeWidth = oldPaint == null || oldPaint.getStrokeWidth() <= 0 ? dp2px(2) : oldPaint.getStrokeWidth();
+        int color = oldPaint == null || oldPaint.getColor() == 0 ? Color.BLACK : oldPaint.getColor();
+        paint.setColor(color);
+        paint.setStrokeWidth(strokeWidth);
+        return paint;
+    }
+
+    private Paint createNewFillErasingPaint(Paint oldPaint) {
+        Paint paint = createPaint();
+        float strokeWidth = oldPaint == null || oldPaint.getStrokeWidth() <= 0 ? dp2px(30) : oldPaint.getStrokeWidth();
+        int color = oldPaint == null || oldPaint.getColor() == 0 ? Color.YELLOW : oldPaint.getColor();
+        paint.setStrokeWidth(strokeWidth);
+        paint.setColor(color);
 
         return paint;
     }
 
-    private Paint createNewErasePaint() {
-        Paint paint = createNewTempErasePaint();
+    private Paint createNewErasingPaint(Paint oldPaint) {
+        Paint paint = createNewFillErasingPaint(oldPaint);
+
+        // Important one
         PorterDuffXfermode porterDuffXfermode = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
         paint.setXfermode(porterDuffXfermode);
 
         return paint;
     }
 
-
-//-----------------------------------------------------------------------------
-// Listener - hoangminh - 1:46 PM - 1/28/16
-//-----------------------------------------------------------------------------
+    //-----------------------------------------------------------------------------
+    // Listener - hoangminh - 6:40 PM - 3/4/16
+    //-----------------------------------------------------------------------------
 
     public interface OnSignedListener {
         void onSigned();
@@ -439,13 +433,13 @@ public class SignaturePad extends View {
     // Get and set bitmap - hoangminh - 1:47 PM - 1/28/16
     //-----------------------------------------------------------------------------
 
-    public Bitmap getTransparentSignatureBitmap() {
+    public Bitmap getTransparentBitmap() {
         ensureSignatureBitmap();
         return mSignatureBitmap;
     }
 
-    public Bitmap getSignatureBitmap() {
-        Bitmap originalBitmap = getTransparentSignatureBitmap();
+    public Bitmap getBitmapWithBackgroundColor() {
+        Bitmap originalBitmap = getTransparentBitmap();
         Bitmap whiteBgBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(whiteBgBitmap);
         canvas.drawColor(Color.WHITE);
@@ -453,11 +447,16 @@ public class SignaturePad extends View {
         return whiteBgBitmap;
     }
 
+    public Bitmap getTrimBitmap() {
+        Bitmap transparentBitmap = getTransparentBitmap();
+        return BitmapUtils.trimBitmap(transparentBitmap);
+    }
+
     public void setSignatureBitmap(Bitmap bitmap) {
         if (bitmap == null)
             return;
         mPreloadBitmap = bitmap;
-        clear();
+        removeSignaturePad();
         ensureSignatureBitmap();
 
         RectF tempSrc = new RectF();
