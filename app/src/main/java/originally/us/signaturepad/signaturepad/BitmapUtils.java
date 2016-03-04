@@ -18,13 +18,14 @@ public class BitmapUtils {
 
         // Create smaller bitmap if bitmap too big
         int scale = 1;
+        Bitmap scaleBitmap = bitmap;
         if (bitmap.getWidth() > 500) {
             scale = 8;
-            bitmap = Bitmap.createScaledBitmap(bitmap, bitmap.getWidth() / scale, bitmap.getHeight() / scale, false);
+            scaleBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.getWidth() / scale, bitmap.getHeight() / scale, false);
         }
 
         // Find bounds
-        int[] bounds = findBoundsOfVisibleBitmap(bitmap);
+        int[] bounds = findBoundsOfVisibleBitmap(scaleBitmap);
 
         // Get real bitmap bound
         int left = bounds[0] * scale;
@@ -32,8 +33,11 @@ public class BitmapUtils {
         int right = bounds[2] * scale;
         int bottom = bounds[3] * scale;
 
+        int width = right - left;
+        int height = bottom - top;
+
         // Trim bitmap
-        return Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top);
+        return Bitmap.createBitmap(bitmap, left, top, width, height);
     }
 
     public static int[] findBoundsOfVisibleBitmap(Bitmap bitmap) {
