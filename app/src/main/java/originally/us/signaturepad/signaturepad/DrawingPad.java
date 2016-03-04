@@ -328,13 +328,18 @@ public class DrawingPad extends View {
     //-----------------------------------------------------------------------------
     //- Get bitmap - hoangminh - 12:20 PM - 3/4/16
 
-    public Bitmap getTransparentSignatureBitmap() {
+    public Bitmap getTransparentDrawingBitmap() {
         ensureDrawingBitmap();
         return mDrawingBitmap;
     }
 
-    public Bitmap getDrawingBitmap(@ColorInt int bgColor) {
-        Bitmap originalBitmap = getTransparentSignatureBitmap();
+    public Bitmap getTrimBitmap() {
+        Bitmap transparentBitmap = getTransparentDrawingBitmap();
+        return BitmapUtils.trimBitmap(transparentBitmap);
+    }
+
+    public Bitmap getWithBgDrawingBitmap(@ColorInt int bgColor) {
+        Bitmap originalBitmap = getTransparentDrawingBitmap();
         Bitmap whiteBgBitmap = Bitmap.createBitmap(originalBitmap.getWidth(), originalBitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(whiteBgBitmap);
         canvas.drawColor(bgColor);
