@@ -85,14 +85,14 @@ public class MainActivity extends AppCompatActivity {
         mBtnErase.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mSignaturePad.setErasing(true);
+                mSignaturePad.enableErasingMode(0, 0);
             }
         });
 
         mBtnBrush.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mSignaturePad.setErasing(false);
+                mSignaturePad.enableDrawingMode(0, 0);
             }
         });
 

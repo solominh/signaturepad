@@ -295,15 +295,6 @@ public class SignaturePad extends View implements DrawingOptions {
         invalidate();
     }
 
-    public void setErasing(boolean isErasing) {
-        mIsInEraseMode = isErasing;
-
-        if (isErasing)
-            this.setOnTouchListener(new OnTouchToErase());
-        else
-            this.setOnTouchListener(new OnTouchToDraw());
-    }
-
     @Override
     public void enableErasingMode(int strokeWidth, @ColorRes int strokeColor) {
         if (strokeWidth > 0 || strokeColor > 0) {
@@ -338,12 +329,10 @@ public class SignaturePad extends View implements DrawingOptions {
     }
 
     private void drawPathList() {
-        // Reset bitmap
-        setSignatureBitmap(mPreloadBitmap);
-
+        createNewErasureBitmap();
         // Draw path
         for (PathAndPaint model : mMovePathList) {
-            mSignatureBitmapCanvas.drawPath(model.path, model.paint);
+            mErasureBitmapCanvas.drawPath(model.path, model.paint);
         }
     }
 
