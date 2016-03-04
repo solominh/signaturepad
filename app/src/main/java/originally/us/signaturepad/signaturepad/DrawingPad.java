@@ -1,7 +1,6 @@
 package originally.us.signaturepad.signaturepad;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -26,7 +25,7 @@ import originally.us.originally.us.signaturepad.signaturepad.R;
 /**
  * Created by hoangminh on 3/4/16.
  */
-public class DrawingPad extends View {
+public class DrawingPad extends View implements DrawingOptions {
 
     // Current view
     private Bitmap mDrawingBitmap = null;
@@ -41,7 +40,9 @@ public class DrawingPad extends View {
     private Bitmap mPreloadBitmap = null;
 
     // Paint
-    private Paint mDrawingPaint = new Paint();
+    private Paint mDrawingPaint = createNewDrawingPaint(null);
+    private Paint mErasingPaint = createNewErasingPaint(null);
+    private Paint mFillErasingPaint = createNewFillErasingPaint(null);
 
     // For undo and redo function
     private List<PathAndPaint> mMovePathList = new ArrayList<>();
@@ -66,36 +67,11 @@ public class DrawingPad extends View {
             a.recycle();
         }
 
-        // Fixed parameters
-        mDrawingPaint.setAntiAlias(true);
-        mDrawingPaint.setStyle(Paint.Style.STROKE);
-        mDrawingPaint.setStrokeCap(Paint.Cap.ROUND);
-        mDrawingPaint.setStrokeJoin(Paint.Join.ROUND);
-
+        // Reset
         clear();
 
         // Drawing
         this.setOnTouchListener(new OnTouchToDrawSimplePath());
-    }
-
-    //-----------------------------------------------------------------------------
-    // Settings - hoangminh - 11:58 AM - 3/4/16
-    //-----------------------------------------------------------------------------
-
-    public void setStrokeColor(@ColorInt int color) {
-        mDrawingPaint.setColor(color);
-    }
-
-    public void setStrokeColorRes(@ColorRes int colorRes) {
-        try {
-            setStrokeColor(getResources().getColor(colorRes));
-        } catch (Resources.NotFoundException ex) {
-            setStrokeColor(Color.BLACK);
-        }
-    }
-
-    public void setStrokeWidth(float strokeWidth) {
-        mDrawingPaint.setStrokeWidth(strokeWidth);
     }
 
     //-----------------------------------------------------------------------------
@@ -120,7 +96,6 @@ public class DrawingPad extends View {
     // Drawing mode
     private class OnTouchToDrawSimplePath implements View.OnTouchListener {
         private Path mDrawingPath;
-        private Paint mDrawingPaint;
         private float mPreviousX, mPreviousY;
 
         @Override
@@ -132,7 +107,6 @@ public class DrawingPad extends View {
                     // Create path and paint
                     // Create new path for array list cache new object (avoid reference error)
                     mDrawingPath = new Path();
-                    mDrawingPaint = createNewDrawingPaint();
 
                     // Cache path and paint
                     PathAndPaint pathAndPaint = new PathAndPaint(mDrawingPath, mDrawingPaint);
@@ -168,17 +142,9 @@ public class DrawingPad extends View {
 
     // Erasing mode
     private class OnTouchToErase implements View.OnTouchListener {
-        private Paint mTempErasePaint;
-
         private Path mErasePath;
-        private Paint mErasePaint;
 
         private float mPreviousX, mPreviousY;
-
-        public OnTouchToErase() {
-            mTempErasePaint = createNewTempErasePaint();
-            mErasePaint = createNewErasePaint();
-        }
 
         @Override
         public boolean onTouch(View v, MotionEvent event) {
@@ -192,7 +158,7 @@ public class DrawingPad extends View {
                     mErasePath = new Path();
 
                     // Cache path and paint
-                    PathAndPaint pathAndPaint = new PathAndPaint(mErasePath, mErasePaint);
+                    PathAndPaint pathAndPaint = new PathAndPaint(mErasePath, mErasingPaint);
                     mMovePathList.add(pathAndPaint);
 
                     getParent().requestDisallowInterceptTouchEvent(true);
@@ -206,13 +172,13 @@ public class DrawingPad extends View {
                 case MotionEvent.ACTION_MOVE:
                     mErasePath.lineTo(eventX, eventY);
 
-                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mTempErasePaint);
+                    mErasureBitmapCanvas.drawLine(mPreviousX, mPreviousY, eventX, eventY, mFillErasingPaint);
                     mPreviousX = eventX;
                     mPreviousY = eventY;
                     break;
 
                 case MotionEvent.ACTION_UP:
-                    mDrawingBitmapCanvas.drawBitmap(mErasureBitmap, 0, 0, mErasePaint);
+                    mDrawingBitmapCanvas.drawBitmap(mErasureBitmap, 0, 0, mErasingPaint);
                     mErasureBitmap = null;
                     break;
 
@@ -228,6 +194,7 @@ public class DrawingPad extends View {
     // Expose methods - hoangminh - 1:46 PM - 1/28/16
     //-----------------------------------------------------------------------------
 
+    @Override
     public void clear() {
         if (mDrawingBitmap != null) {
             mDrawingBitmap = null;
@@ -240,10 +207,12 @@ public class DrawingPad extends View {
         invalidate();
     }
 
+    @Override
     public void reset() {
         setDrawingBitmap(mPreloadBitmap);
     }
 
+    @Override
     public void undo() {
         if (mMovePathList.size() <= 0)
             return;
@@ -257,6 +226,7 @@ public class DrawingPad extends View {
         invalidate();
     }
 
+    @Override
     public void redo() {
         if (mUndoPathList.size() <= 0)
             return;
@@ -270,14 +240,35 @@ public class DrawingPad extends View {
         invalidate();
     }
 
-    // Set erasing mode or drawing mode
-    public void setErasing(boolean isErasing) {
-        mIsInEraseMode = isErasing;
+    @Override
+    public void enableErasingMode(int strokeWidth, @ColorRes int strokeColor) {
+        if (strokeWidth > 0 || strokeColor > 0) {
+            mErasingPaint = createNewErasingPaint(mErasingPaint);
+            mFillErasingPaint = createNewFillErasingPaint(mFillErasingPaint);
+            applySetting(mErasingPaint, strokeWidth, strokeColor);
+            applySetting(mFillErasingPaint, strokeWidth, strokeColor);
+        }
 
-        if (isErasing)
-            this.setOnTouchListener(new OnTouchToErase());
-        else
-            this.setOnTouchListener(new OnTouchToDrawSimplePath());
+        mIsInEraseMode = true;
+        this.setOnTouchListener(new OnTouchToErase());
+    }
+
+    @Override
+    public void enableDrawingMode(int strokeWidth, @ColorRes int strokeColor) {
+        if (strokeWidth > 0 || strokeColor > 0) {
+            mDrawingPaint = createNewDrawingPaint(mDrawingPaint);
+            applySetting(mDrawingPaint, strokeWidth, strokeColor);
+        }
+
+        mIsInEraseMode = false;
+        this.setOnTouchListener(new OnTouchToDrawSimplePath());
+    }
+
+    private void applySetting(Paint paint, int strokeWidth, @ColorRes int strokeColor) {
+        if (strokeWidth > 0)
+            paint.setStrokeWidth(strokeWidth);
+        if (strokeColor > 0)
+            paint.setColor(getResources().getColor(strokeColor));
     }
 
     //-----------------------------------------------------------------------------
@@ -294,27 +285,41 @@ public class DrawingPad extends View {
         }
     }
 
-    private Paint createNewDrawingPaint() {
+    //-----------------------------------------------------------------------------
+    //- Drawing paint - hoangminh - 3:27 PM - 3/4/16
+
+    private Paint createPaint() {
         Paint paint = new Paint();
         paint.setAntiAlias(true);
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
-        paint.setColor(Color.BLACK);
-        paint.setStrokeWidth(8f);
         return paint;
     }
 
-    private Paint createNewTempErasePaint() {
-        Paint paint = createNewDrawingPaint();
-        paint.setStrokeWidth(30);
-        paint.setColor(Color.YELLOW);
+    private Paint createNewDrawingPaint(Paint oldPaint) {
+        Paint paint = createPaint();
+        float strokeWidth = oldPaint == null || oldPaint.getStrokeWidth() <= 0 ? dp2px(2) : oldPaint.getStrokeWidth();
+        int color = oldPaint == null || oldPaint.getColor() == 0 ? Color.BLACK : oldPaint.getColor();
+        paint.setColor(color);
+        paint.setStrokeWidth(strokeWidth);
+        return paint;
+    }
+
+    private Paint createNewFillErasingPaint(Paint oldPaint) {
+        Paint paint = createPaint();
+        float strokeWidth = oldPaint == null || oldPaint.getStrokeWidth() <= 0 ? dp2px(5) : oldPaint.getStrokeWidth();
+        int color = oldPaint == null || oldPaint.getColor() == 0 ? Color.RED : oldPaint.getColor();
+        paint.setStrokeWidth(strokeWidth);
+        paint.setColor(color);
 
         return paint;
     }
 
-    private Paint createNewErasePaint() {
-        Paint paint = createNewTempErasePaint();
+    private Paint createNewErasingPaint(Paint oldPaint) {
+        Paint paint = createNewFillErasingPaint(oldPaint);
+
+        // Important one
         PorterDuffXfermode porterDuffXfermode = new PorterDuffXfermode(PorterDuff.Mode.DST_OUT);
         paint.setXfermode(porterDuffXfermode);
 
