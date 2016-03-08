@@ -379,14 +379,14 @@ public class DrawingPad extends View implements DrawingOptions {
 
     // Warning: must wait for bitmap width and height available => ViewTreeObserver
     public void setPreloadBitmap(Bitmap bitmap) {
-        // Sanity check
-        if (bitmap == null)
-            return;
-
         // Clear bitmap
         mPreloadBitmap = bitmap;
         removeDrawingBitmap();
         ensureDrawingBitmap();
+
+        // Sanity check
+        if (bitmap == null)
+            return;
 
         // Get drawMatrix
         RectF tempSrc = new RectF();

@@ -104,7 +104,7 @@ public class DrawingPadActivity extends AppCompatActivity {
             @Override
             public void run() {
                 Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.mipmap.ic_launcher);
-                mDrawingPad.setPreloadBitmap(bitmap);
+//                mDrawingPad.setPreloadBitmap(bitmap);
             }
         });
     }
